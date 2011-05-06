@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.Media;
 using Android.Preferences;
 using Android.Runtime;
@@ -23,14 +24,9 @@ using Stream = System.IO.Stream;
 
 namespace Falplayer
 {
-    [Activity(Label = "Falplayer", MainLauncher = true)]
+    [Activity (Label = "Falplayer", MainLauncher = true, LaunchMode = LaunchMode.SingleTask)]
     public class MainActivity : Activity
     {
-        protected override void OnPause()
-        {
-            player.Pause ();
-            base.OnPause();
-        }
         protected override void OnCreate(Bundle bundle)
         {
             base.OnCreate(bundle);
@@ -84,7 +80,8 @@ namespace Falplayer
                     // FIXME: show directory-tree selector dialog and let user pick out dirs.
                     using (var sw = new StreamWriter (ifs.CreateFile ("songdirs.txt"))) {
                         sw.WriteLine ("/sdcard");
-                        sw.WriteLine("/sdcard/falcom");
+                        sw.WriteLine("/sdcard/falcom/ED_SORA3");
+                        sw.WriteLine("/sdcard/falcom/YSO");
                     }
                 }
                 List<string> dirlist = new List<string> ();
@@ -238,9 +235,14 @@ namespace Falplayer
 
         public Player (Activity activity)
         {
-            view = new PlayerView (this, activity);
-            audio = new AudioTrack (Android.Media.Stream.Music, 22050, ChannelConfiguration.Stereo, Android.Media.Encoding.Pcm16bit, buf_size * 5, AudioTrackMode.Stream);
-            task = new PlayerAsyncTask (this);
+            Initialize (activity);
+        }
+
+        void Initialize (Activity activity)
+        {
+            view = new PlayerView(this, activity);
+            audio = new AudioTrack(Android.Media.Stream.Music, 22050, ChannelConfiguration.Stereo, Android.Media.Encoding.Pcm16bit, buf_size * 5, AudioTrackMode.Stream);
+            task = new PlayerAsyncTask(this);
         }
 
         internal string[] GetPlayHistory()
@@ -353,12 +355,6 @@ namespace Falplayer
                 pause_handle.Set ();
                 if (player.IsPlaying)
                     stop = true; // and let player loop finish.
-            }
-
-            protected override void OnCancelled ()
-            {
-                Stop ();
-                base.OnCancelled ();
             }
 
             protected override Java.Lang.Object DoInBackground(params Java.Lang.Object[] @params)
