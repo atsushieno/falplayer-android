@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.IsolatedStorage;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 using Android.App;
 using Android.Content;
@@ -14,10 +15,6 @@ using Android.Runtime;
 using Android.Views;
 using Android.Widget;
 using Android.OS;
-using OpenTK.Audio;
-using OpenTK.Audio.OpenAL;
-using System.IO;
-using System.Threading;
 using UnmanagedOgg;
 
 using Stream = System.IO.Stream;
@@ -95,7 +92,10 @@ namespace Falplayer
 #endif
                 db.SetItems (dirs, delegate (object o, DialogClickEventArgs e) {
                     string dir = dirs [(int) e.Which];
-                    ProcessFileSelectionDialog (dir, mus => player.SelectFile (mus));
+                    ProcessFileSelectionDialog (dir, delegate (string mus) {
+                        player.SelectFile (mus);
+                        player.Play ();
+                        });
                 });
                 var dlg = db.Show ();
             };
@@ -104,10 +104,8 @@ namespace Falplayer
                 try {
                     if (player.IsPlaying) {
                         player.Pause ();
-                        play_button.Text = "Play";
                     } else {
                         player.Play ();
-                        play_button.Text = "Pause";
                     }
                 } catch (Exception ex) {
                     play_button.Text = ex.Message;
@@ -118,6 +116,16 @@ namespace Falplayer
                 player.Stop ();
                 play_button.Text = "Play";
             };
+        }
+
+        internal void SetPlayState ()
+        {
+            activity.RunOnUiThread (() => play_button.Text = "Pause");
+        }
+
+        internal void SetPauseState ()
+        {
+            activity.RunOnUiThread (() => play_button.Text = "Play");
         }
 
         void ProcessFileSelectionDialog (string dir, Action<string> action)
@@ -224,13 +232,15 @@ namespace Falplayer
 
     class Player
     {
+        const int CompressionRate = 2 * 2; // reduced PCM size * channels
+
         PlayerView view;
         AudioTrack audio;
         OggStreamBuffer vorbis_buffer;
         LoopCommentExtension loop;
         PlayerAsyncTask task;
 
-        static readonly int min_buf_size = AudioTrack.GetMinBufferSize(22050, (int)ChannelConfiguration.Stereo, Encoding.Pcm16bit);
+        static readonly int min_buf_size = AudioTrack.GetMinBufferSize (44100 / CompressionRate * 2, (int) ChannelConfiguration.Stereo, Encoding.Pcm16bit);
         int buf_size = min_buf_size * 8;
 
         public Player (Activity activity)
@@ -240,8 +250,9 @@ namespace Falplayer
 
         void Initialize (Activity activity)
         {
-            view = new PlayerView(this, activity);
-            audio = new AudioTrack(Android.Media.Stream.Music, 22050, ChannelConfiguration.Stereo, Android.Media.Encoding.Pcm16bit, buf_size * 5, AudioTrackMode.Stream);
+            view = new PlayerView (this, activity);
+            // "* 8" part is adjusted for emulator.
+            audio = new AudioTrack (Android.Media.Stream.Music, 44100 / CompressionRate * 2, ChannelConfiguration.Stereo, Android.Media.Encoding.Pcm16bit, buf_size * 8, AudioTrackMode.Stream);
             task = new PlayerAsyncTask(this);
         }
 
@@ -274,7 +285,7 @@ namespace Falplayer
 
         public void InitializeVorbisBuffer ()
         {
-            view.Initialize (loop.Total * 4, loop.Start * 4, loop.Length * 4, loop.End * 4);
+            view.Initialize(loop.Total * CompressionRate, loop.Start * CompressionRate, loop.Length * CompressionRate, loop.End * CompressionRate);
             task.LoadVorbisBuffer (vorbis_buffer, loop);
         }
 
@@ -296,11 +307,13 @@ namespace Falplayer
                 InitializeVorbisBuffer ();
                 task.Execute ();
             }
+            view.SetPlayState ();
         }
 
         public void Pause ()
         {
             task.Pause ();
+            view.SetPauseState ();
         }
 
         public void Stop ()
@@ -347,7 +360,7 @@ namespace Falplayer
             public void Seek (long pos)
             {
                 total = pos;
-                player.vorbis_buffer.SeekPcm (pos / 4);
+                player.vorbis_buffer.SeekPcm(pos / CompressionRate);
             }
 
             public void Stop ()
@@ -366,8 +379,8 @@ namespace Falplayer
             {
                 x = 0;
                 total = 0;
-                long loop_start = player.Loop.Start * 4, loop_length = player.Loop.Length * 4, loop_end = player.Loop.End * 4;
-                buffer = new byte [player.buf_size / 4];
+                long loop_start = player.Loop.Start * CompressionRate, loop_length = player.Loop.Length * CompressionRate, loop_end = player.Loop.End * CompressionRate;
+                buffer = new byte[player.buf_size / CompressionRate];
 
                 player.audio.Play ();
                 while (!stop)
@@ -396,16 +409,16 @@ namespace Falplayer
                         player.view.ReportProgress (total);
 
                     // downgrade bitrate
-                    for (int i = 1; i < ret / 2; i++)
-                        buffer[i] = buffer[i * 2 + 1];
-                    player.audio.Write (buffer, 0, (int) ret / 2);
+                    for (int i = 1; i < ret * 2 / CompressionRate; i++)
+                        buffer[i] = buffer[i * CompressionRate / 2 + (CompressionRate / 2) - 1];
+                    player.audio.Write (buffer, 0, (int) ret * 2 / CompressionRate);
                     player.audio.Flush ();
                     total += ret;
                     // loop back to LOOPSTART
                     if (total >= loop_end)
                     {
                         player.view.ProcessLoop(loop_start);
-                        player.vorbis_buffer.SeekPcm (loop_start / 4); // also faked
+                        player.vorbis_buffer.SeekPcm(loop_start / CompressionRate); // also faked
                         total = loop_start;
                     }
                 }
