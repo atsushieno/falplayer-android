@@ -232,7 +232,7 @@ namespace Falplayer
 
     class Player
     {
-        const int CompressionRate = 2 * 2; // reduced PCM size * channels
+        const int CompressionRate = 4;
 
         PlayerView view;
         AudioTrack audio;
@@ -251,8 +251,8 @@ namespace Falplayer
         void Initialize (Activity activity)
         {
             view = new PlayerView (this, activity);
-            // "* 8" part is adjusted for emulator.
-            audio = new AudioTrack (Android.Media.Stream.Music, 44100 / CompressionRate * 2, ChannelConfiguration.Stereo, Android.Media.Encoding.Pcm16bit, buf_size * 8, AudioTrackMode.Stream);
+            // "* n" part is adjusted for emulator.
+            audio = new AudioTrack (Android.Media.Stream.Music, 44100 / CompressionRate * 2, ChannelConfiguration.Stereo, Android.Media.Encoding.Pcm16bit, buf_size * 2, AudioTrackMode.Stream);
             task = new PlayerAsyncTask(this);
         }
 
@@ -285,7 +285,7 @@ namespace Falplayer
 
         public void InitializeVorbisBuffer ()
         {
-            view.Initialize(loop.Total * CompressionRate, loop.Start * CompressionRate, loop.Length * CompressionRate, loop.End * CompressionRate);
+            view.Initialize(loop.Total * 4, loop.Start * 4, loop.Length * 4, loop.End * 4);
             task.LoadVorbisBuffer (vorbis_buffer, loop);
         }
 
@@ -360,7 +360,7 @@ namespace Falplayer
             public void Seek (long pos)
             {
                 total = pos;
-                player.vorbis_buffer.SeekPcm(pos / CompressionRate);
+                player.vorbis_buffer.SeekPcm(pos / 4);
             }
 
             public void Stop ()
@@ -379,8 +379,8 @@ namespace Falplayer
             {
                 x = 0;
                 total = 0;
-                long loop_start = player.Loop.Start * CompressionRate, loop_length = player.Loop.Length * CompressionRate, loop_end = player.Loop.End * CompressionRate;
-                buffer = new byte[player.buf_size / CompressionRate];
+                long loop_start = player.Loop.Start * 4, loop_length = player.Loop.Length * 4, loop_end = player.Loop.End * 4;
+                buffer = new byte [player.buf_size / 2 / CompressionRate];
 
                 player.audio.Play ();
                 while (!stop)
@@ -417,8 +417,8 @@ namespace Falplayer
                     // loop back to LOOPSTART
                     if (total >= loop_end)
                     {
-                        player.view.ProcessLoop(loop_start);
-                        player.vorbis_buffer.SeekPcm(loop_start / CompressionRate); // also faked
+                        player.view.ProcessLoop (loop_start);
+                        player.vorbis_buffer.SeekPcm (loop_start / 4); // also faked
                         total = loop_start;
                     }
                 }
