@@ -235,13 +235,9 @@ namespace Falplayer
         const int CompressionRate = 2;
 
         PlayerView view;
-        AudioTrack audio;
         OggStreamBuffer vorbis_buffer;
         LoopCommentExtension loop;
         PlayerAsyncTask task;
-
-        static readonly int min_buf_size = AudioTrack.GetMinBufferSize (44100 / CompressionRate * 2, (int) ChannelConfiguration.Stereo, Encoding.Pcm16bit);
-        int buf_size = min_buf_size * 8;
 
         public Player (Activity activity)
         {
@@ -252,7 +248,6 @@ namespace Falplayer
         {
             view = new PlayerView (this, activity);
             // "* n" part is adjusted for emulator.
-            audio = new AudioTrack (Android.Media.Stream.Music, 44100 / CompressionRate * 2, ChannelConfiguration.Stereo, Android.Media.Encoding.Pcm16bit, buf_size * 2, AudioTrackMode.Stream);
             task = new PlayerAsyncTask(this);
         }
 
@@ -299,12 +294,12 @@ namespace Falplayer
 
         public bool IsPlaying
         {
-            get { return audio.PlayState == PlayState.Playing; }
+            get { return task.Status == PlayerStatus.Playing; }
         }
 
         public void Play ()
         {
-            if (audio.PlayState == PlayState.Paused)
+            if (task.Status == PlayerStatus.Paused)
                 task.Resume ();
             else {
                 Stop ();
@@ -362,6 +357,10 @@ namespace Falplayer
 
         class PlayerAsyncTask //: AsyncTask
         {
+            static readonly int min_buf_size = AudioTrack.GetMinBufferSize(44100 / CompressionRate * 2, (int)ChannelConfiguration.Stereo, Encoding.Pcm16bit);
+            int buf_size = min_buf_size * 8;
+
+            AudioTrack audio;
             Player player;
             bool pause, finish;
             AutoResetEvent pause_handle = new AutoResetEvent (false);
@@ -373,11 +372,12 @@ namespace Falplayer
             public PlayerAsyncTask (Player player)
             {
                 this.player = player;
-                buffer = new byte [player.buf_size / 2 / CompressionRate];
+                audio = new AudioTrack (Android.Media.Stream.Music, 44100 / CompressionRate * 2, ChannelConfiguration.Stereo, Android.Media.Encoding.Pcm16bit, buf_size * 2, AudioTrackMode.Stream);
+                buffer = new byte [buf_size / 2 / CompressionRate];
                 player_thread = new Thread (() => DoRun ());
             }
 
-            public PlayerStatus Status { get; set; }
+            public PlayerStatus Status { get; private set; }
 
             public void LoadVorbisBuffer (OggStreamBuffer ovb, LoopCommentExtension loop)
             {
@@ -407,7 +407,7 @@ namespace Falplayer
                 var prevStat = Status;
                 if (prevStat == PlayerStatus.Playing)
                     Pause ();
-                player.audio.Flush ();
+                audio.Flush ();
                 SpinWait.SpinUntil(() => !pause);
                 total = pos;
                 player.vorbis_buffer.SeekPcm (pos / 4);
@@ -439,14 +439,14 @@ namespace Falplayer
                 x = 0;
                 total = 0;
 
-                player.audio.Play ();
+                audio.Play ();
                 while (!finish)
                 {
                     if (pause) {
                         pause = false;
-                        player.audio.Pause ();
+                        audio.Pause ();
                         pause_handle.WaitOne ();
-                        player.audio.Play ();
+                        audio.Play ();
                     }
                     long ret = player.vorbis_buffer.Read (buffer, 0, buffer.Length);
                     if (ret <= 0 || ret > buffer.Length) {
@@ -468,7 +468,7 @@ namespace Falplayer
                     // downgrade bitrate
                     for (int i = 1; i < ret * 2 / CompressionRate; i++)
                         buffer[i] = buffer[i * CompressionRate / 2 + (CompressionRate / 2) - 1];
-                    player.audio.Write (buffer, 0, (int)ret * 2 / CompressionRate);
+                    audio.Write (buffer, 0, (int)ret * 2 / CompressionRate);
                     // loop back to LOOPSTART
                     if (total >= loop_end)
                     {
@@ -477,8 +477,8 @@ namespace Falplayer
                         total = loop_start;
                     }
                 }
-                player.audio.Flush ();
-                player.audio.Stop ();
+                audio.Flush ();
+                audio.Stop ();
                 player.OnComplete ();
                 return null;
             }
