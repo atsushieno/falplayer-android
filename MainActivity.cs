@@ -232,7 +232,7 @@ namespace Falplayer
 
     class Player
     {
-        const int CompressionRate = 4;
+        const int CompressionRate = 2;
 
         PlayerView view;
         AudioTrack audio;
@@ -271,10 +271,14 @@ namespace Falplayer
         public void SelectFile (string file)
         {
             Android.Util.Log.Debug ("FALPLAYER", "file to play: " + file);
-            if (!GetPlayHistory ().Contains (file)) {
+            var hist = GetPlayHistory ();
+            if (!hist.Contains (file)) {
                 var ifs = IsolatedStorageFile.GetUserStoreForApplication ();
-                using (var sw = new StreamWriter (ifs.OpenFile ("history.txt", FileMode.OpenOrCreate)))
+                using (var sw = new StreamWriter (ifs.OpenFile ("history.txt", FileMode.Append))) {
+                    foreach (var h in hist.Skip (1))
+                        sw.WriteLine (h);
                     sw.WriteLine (file);
+                }
             }
 
             Stream input = File.OpenRead (file);
@@ -303,9 +307,11 @@ namespace Falplayer
             if (audio.PlayState == PlayState.Paused)
                 task.Resume ();
             else {
+                Stop ();
                 task = new PlayerAsyncTask (this);
                 InitializeVorbisBuffer ();
-                task.Execute ();
+                //task.Execute ();
+                task.Start ();
             }
             view.SetPlayState ();
         }
@@ -327,104 +333,153 @@ namespace Falplayer
             task.Seek (pos);
         }
 
-        class PlayerAsyncTask : AsyncTask
+        internal void OnComplete ()
+        {
+            view.ProcessComplete();
+        }
+
+        internal void OnPlayerError (string msgbase, params object [] args)
+        {
+            view.Error (msgbase, args);
+        }
+
+        internal void OnProgress (long pos)
+        {
+            view.ReportProgress (pos);
+        }
+
+        internal void OnLoop (long resetPosition)
+        {
+            view.ProcessLoop (resetPosition);
+        }
+
+        enum PlayerStatus
+        {
+            Stopped,
+            Playing,
+            Paused,
+        }
+
+        class PlayerAsyncTask //: AsyncTask
         {
             Player player;
-            bool pause, stop;
-            ManualResetEvent pause_handle = new ManualResetEvent (false);
+            bool pause, finish;
+            AutoResetEvent pause_handle = new AutoResetEvent (false);
             int x;
             byte [] buffer;
-            long total;
+            long loop_start, loop_length, loop_end, total;
+            Thread player_thread;
 
             public PlayerAsyncTask (Player player)
             {
                 this.player = player;
+                buffer = new byte [player.buf_size / 2 / CompressionRate];
+                player_thread = new Thread (() => DoRun ());
             }
+
+            public PlayerStatus Status { get; set; }
 
             public void LoadVorbisBuffer (OggStreamBuffer ovb, LoopCommentExtension loop)
             {
+                loop_start = loop.Start * 4;
+                loop_length = loop.Length * 4;
+                loop_end = loop.End * 4;
                 total = loop.Total;
             }
 
             public void Pause ()
             {
+                Status = PlayerStatus.Paused;
                 pause = true;
             }
 
             public void Resume ()
             {
+                Status = PlayerStatus.Playing;
                 pause = false; // make sure to not get overwritten
                 pause_handle.Set ();
             }
 
             public void Seek (long pos)
             {
+                if (pos < 0 || pos >= loop_end) 
+                    return; // ignore
+                var prevStat = Status;
+                if (prevStat == PlayerStatus.Playing)
+                    Pause ();
+                player.audio.Flush ();
+                SpinWait.SpinUntil(() => !pause);
                 total = pos;
-                player.vorbis_buffer.SeekPcm(pos / 4);
+                player.vorbis_buffer.SeekPcm (pos / 4);
+                if (prevStat == PlayerStatus.Playing)
+                    Resume ();
             }
 
             public void Stop ()
             {
+                finish = true; // and let player loop finish.
                 pause_handle.Set ();
-                if (player.IsPlaying)
-                    stop = true; // and let player loop finish.
+                Status = PlayerStatus.Stopped;
             }
 
+            public void Start ()
+            {
+                player_thread.Start ();
+            }
+            /*
             protected override Java.Lang.Object DoInBackground(params Java.Lang.Object[] @params)
             {
                 return DoRun();
             }
+            */
 
             Java.Lang.Object DoRun()
             {
+                Status = PlayerStatus.Playing;
                 x = 0;
                 total = 0;
-                long loop_start = player.Loop.Start * 4, loop_length = player.Loop.Length * 4, loop_end = player.Loop.End * 4;
-                buffer = new byte [player.buf_size / 2 / CompressionRate];
 
                 player.audio.Play ();
-                while (!stop)
+                while (!finish)
                 {
                     if (pause) {
                         pause = false;
+                        player.audio.Pause ();
                         pause_handle.WaitOne ();
+                        player.audio.Play ();
                     }
                     long ret = player.vorbis_buffer.Read (buffer, 0, buffer.Length);
-                    if (ret <= 0 || ret > buffer.Length)
-                    {
-                        stop = true;
+                    if (ret <= 0 || ret > buffer.Length) {
+                        finish = true;
                         if (ret < 0)
-                            player.view.Error ("vorbis error : {0}", ret);
+                            player.OnPlayerError ("vorbis error : {0}", ret);
                         else if (ret > buffer.Length)
-                            player.view.Error ("buffering overflow : {0}", ret);
-                        else
-                            player.view.ProcessComplete ();
+                            player.OnPlayerError ("buffer overflow : {0}", ret);
                         break;
                     }
 
                     if (ret + total >= loop_end)
                         ret = loop_end - total; // cut down the buffer after loop
+                    total += ret;
 
                     if (++x % 50 == 0)
-                        player.view.ReportProgress (total);
+                        player.OnProgress (total);
 
                     // downgrade bitrate
                     for (int i = 1; i < ret * 2 / CompressionRate; i++)
                         buffer[i] = buffer[i * CompressionRate / 2 + (CompressionRate / 2) - 1];
-                    player.audio.Write (buffer, 0, (int) ret * 2 / CompressionRate);
-                    player.audio.Flush ();
-                    total += ret;
+                    player.audio.Write (buffer, 0, (int)ret * 2 / CompressionRate);
                     // loop back to LOOPSTART
                     if (total >= loop_end)
                     {
-                        player.view.ProcessLoop (loop_start);
+                        player.OnLoop (loop_start);
                         player.vorbis_buffer.SeekPcm (loop_start / 4); // also faked
                         total = loop_start;
                     }
                 }
+                player.audio.Flush ();
                 player.audio.Stop ();
-                player.audio.Release (); // FIXME: this needs to be reconsidered. Re-playing causes error.
-                player.view.ProcessComplete ();
+                player.OnComplete ();
                 return null;
             }
         }
