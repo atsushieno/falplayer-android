@@ -234,6 +234,7 @@ namespace Falplayer
     {
         const int CompressionRate = 2;
 
+        Activity activity;
         PlayerView view;
         OggStreamBuffer vorbis_buffer;
         LoopCommentExtension loop;
@@ -246,9 +247,11 @@ namespace Falplayer
 
         void Initialize (Activity activity)
         {
+            this.activity = activity;
             view = new PlayerView (this, activity);
             // "* n" part is adjusted for emulator.
             task = new PlayerAsyncTask(this);
+            headset_status_receiver = new HeadphoneStatusReceiver (this);
         }
 
         internal string[] GetPlayHistory()
@@ -297,6 +300,8 @@ namespace Falplayer
             get { return task.Status == PlayerStatus.Playing; }
         }
 
+        HeadphoneStatusReceiver headset_status_receiver;
+
         public void Play ()
         {
             if (task.Status == PlayerStatus.Paused)
@@ -309,6 +314,7 @@ namespace Falplayer
                 task.Start ();
             }
             view.SetPlayState ();
+            activity.RegisterReceiver (headset_status_receiver, new IntentFilter(AudioManager.ActionAudioBecomingNoisy));
         }
 
         public void Pause ()
@@ -482,6 +488,21 @@ namespace Falplayer
                 player.OnComplete ();
                 return null;
             }
+        }
+    }
+
+    class HeadphoneStatusReceiver : BroadcastReceiver
+    {
+        Player player;
+        public HeadphoneStatusReceiver (Player player)
+        {
+            this.player = player;
+        }
+
+        public override void OnReceive (Context context, Intent intent)
+        {
+            if (intent.Action == AudioManager.ActionAudioBecomingNoisy)
+                player.Pause ();
         }
     }
 
