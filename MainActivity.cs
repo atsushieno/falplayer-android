@@ -34,26 +34,55 @@ namespace Falplayer
             player = new Player (this);
         }
         Player player;
+
+        internal void CreateSongDirectoryList ()
+        {
+            var ifs = IsolatedStorageFile.GetUserStoreForApplication();
+            var list = GetOggDirectories ("/sdcard");
+            using (var sw = new StreamWriter(ifs.CreateFile("songdirs.txt")))
+                foreach (var dir in list)
+                    sw.WriteLine(dir);
+        }
+
+        IEnumerable<string> GetOggDirectories (string path)
+        {
+            foreach (var dir in Directory.EnumerateDirectories (path))
+            {
+                // FIXME: not sure why, but EnumerateFiles (dir, "*.ogg") fails.
+                // FIXME: case insensitive search is desired.
+                string[] files;
+                try {
+                    files = Directory.GetFiles (dir, "*.ogg");
+                } catch (UnauthorizedAccessException) {
+                    continue;
+                }
+                if (files.Any ())
+                    yield return dir;
+                foreach (var sub in GetOggDirectories (dir))
+                    yield return sub;
+            }
+        }
     }
 
     class PlayerView : Java.Lang.Object, SeekBar.IOnSeekBarChangeListener
     {
         const string from_history_tag = "<from history>";
         Player player;
-        Activity activity;
-        Button load_button, play_button, stop_button;
+        MainActivity activity;
+        Button load_button, play_button, stop_button, rescan_button;
         TextView title_text_view;
         SeekBar seekbar;
         long loop_start, loop_length, loop_end, total_length;
         int loops;
 
-        public PlayerView (Player player, Activity activity)
+        public PlayerView (Player player, MainActivity activity)
         {
             this.player = player;
             this.activity = activity;
             this.load_button = activity.FindViewById<Button>(Resource.Id.SelectButton);
             this.play_button = activity.FindViewById<Button>(Resource.Id.PlayButton);
             this.stop_button = activity.FindViewById<Button>(Resource.Id.StopButton);
+            this.rescan_button = activity.FindViewById<Button>(Resource.Id.RescanButton);
             this.seekbar = activity.FindViewById<SeekBar>(Resource.Id.SongSeekbar);
             this.title_text_view = activity.FindViewById<TextView>(Resource.Id.SongTitleTextView);
             PlayerEnabled = false;
@@ -61,32 +90,10 @@ namespace Falplayer
             load_button.Click += delegate {
                 var db = new AlertDialog.Builder (activity);
                 db.SetTitle ("Select Music Folder");
-#if PREFERENCE_USABLE
-                var pref = PreferenceManager.GetDefaultSharedPreferences (activity);
-#if false
-                var dirs = pref.GetString ("file_group", "ZAPZAPZAP!!!").Split('\\');
-#else
-                var dirs = new string[] { "/sdcard/falcom/ED_SORA3", "/sdcard/falcom/YSO" };
-                var edit = pref.Edit();
-                edit.PutString ("file_group", String.Join("\\", dirs));
-                edit.Commit ();
-#endif
-#else
+
                 var ifs = IsolatedStorageFile.GetUserStoreForApplication ();
-                if (!ifs.FileExists ("songdirs.txt")) {
-                    // FIXME: show directory-tree selector dialog and let user pick out dirs.
-                    using (var sw = new StreamWriter (ifs.CreateFile ("songdirs.txt"))) {
-                        #if true
-                        sw.WriteLine ("/sdcard");
-                        sw.WriteLine("/sdcard/falcom/ED_SORA3");
-                        sw.WriteLine("/sdcard/falcom/YSO");
-                        sw.WriteLine("/sdcard/falcom/YS6");
-                        #else
-                        foreach (var dir in GetOggDirectories ("/sdcard"))
-                            sw.WriteLine (dir);
-                        #endif
-                    }
-                }
+                if (!ifs.FileExists ("songdirs.txt"))
+                    CreateSongDirectoryList ();
                 List<string> dirlist = new List<string> ();
                 if (ifs.FileExists ("history.txt"))
                     dirlist.Add (from_history_tag);
@@ -95,7 +102,7 @@ namespace Falplayer
                         if (!String.IsNullOrEmpty (s))
                             dirlist.Add (s);
                 var dirs = dirlist.ToArray ();
-#endif
+
                 db.SetItems (dirs, delegate (object o, DialogClickEventArgs e) {
                     string dir = dirs [(int) e.Which];
                     ProcessFileSelectionDialog (dir, delegate (string mus) {
@@ -121,16 +128,24 @@ namespace Falplayer
             stop_button.Click += delegate {
                 player.Stop ();
             };
+
+            rescan_button.Click += delegate {
+                CreateSongDirectoryList ();
+            };
         }
 
-        IEnumerable<string> GetOggDirectories (string path)
+        void CreateSongDirectoryList ()
         {
-            foreach (var dir in Directory.EnumerateDirectories (path)) {
-                if (Directory.EnumerateFiles (dir).Any (f => f.EndsWith (".ogg", StringComparison.OrdinalIgnoreCase)))
-                    yield return dir;
-                foreach (var sub in GetOggDirectories (dir))
-                    yield return sub;
-            }
+            var wasPlaying = player.IsPlaying;
+            if (wasPlaying)
+                player.Pause ();
+            load_button.Enabled = false;
+            this.title_text_view.Text = "scanning directory...hold on";
+            activity.CreateSongDirectoryList ();
+            this.title_text_view.Text = "";
+            load_button.Enabled = true;
+            if (wasPlaying)
+                player.Play ();
         }
 
         internal void SetPlayState ()
@@ -245,7 +260,7 @@ namespace Falplayer
 
     class Player
     {
-        const int CompressionRate = 2;
+        const int CompressionRate = 4;
 
         Activity activity;
         PlayerView view;
@@ -253,12 +268,12 @@ namespace Falplayer
         LoopCommentExtension loop;
         CorePlayer task;
 
-        public Player (Activity activity)
+        public Player (MainActivity activity)
         {
             Initialize (activity);
         }
 
-        void Initialize (Activity activity)
+        void Initialize (MainActivity activity)
         {
             this.activity = activity;
             view = new PlayerView (this, activity);

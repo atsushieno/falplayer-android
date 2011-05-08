@@ -38,25 +38,22 @@ namespace Falplayer
 		{
 			
 			// aapt resource value: 0x7f050001
-			public const int CancelButton = 2131034113;
-			
-			// aapt resource value: 0x7f050000
-			public const int GroupListView = 2131034112;
+			public const int PlayButton = 2131034113;
 			
 			// aapt resource value: 0x7f050003
-			public const int PlayButton = 2131034115;
+			public const int RescanButton = 2131034115;
 			
-			// aapt resource value: 0x7f050002
-			public const int SelectButton = 2131034114;
-			
-			// aapt resource value: 0x7f050006
-			public const int SongSeekbar = 2131034118;
+			// aapt resource value: 0x7f050000
+			public const int SelectButton = 2131034112;
 			
 			// aapt resource value: 0x7f050005
-			public const int SongTitleTextView = 2131034117;
+			public const int SongSeekbar = 2131034117;
 			
 			// aapt resource value: 0x7f050004
-			public const int StopButton = 2131034116;
+			public const int SongTitleTextView = 2131034116;
+			
+			// aapt resource value: 0x7f050002
+			public const int StopButton = 2131034114;
 			
 			private Id()
 			{
@@ -67,13 +64,10 @@ namespace Falplayer
 		{
 			
 			// aapt resource value: 0x7f030000
-			public const int FileGroupSelector = 2130903040;
+			public const int FileGroupSelectorListItem = 2130903040;
 			
 			// aapt resource value: 0x7f030001
-			public const int FileGroupSelectorListItem = 2130903041;
-			
-			// aapt resource value: 0x7f030002
-			public const int Main = 2130903042;
+			public const int Main = 2130903041;
 			
 			private Layout()
 			{
