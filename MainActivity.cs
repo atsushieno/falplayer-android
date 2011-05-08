@@ -21,7 +21,7 @@ using Stream = System.IO.Stream;
 
 namespace Falplayer
 {
-    [Activity (Label = "Falplayer", MainLauncher = true, LaunchMode = LaunchMode.SingleTask)]
+    [Activity (Label = "Falplayer", MainLauncher = true, LaunchMode = LaunchMode.SingleTask, ScreenOrientation = ScreenOrientation.Portrait)]
     public class MainActivity : Activity
     {
         protected override void OnCreate(Bundle bundle)
@@ -76,9 +76,15 @@ namespace Falplayer
                 if (!ifs.FileExists ("songdirs.txt")) {
                     // FIXME: show directory-tree selector dialog and let user pick out dirs.
                     using (var sw = new StreamWriter (ifs.CreateFile ("songdirs.txt"))) {
+                        #if true
                         sw.WriteLine ("/sdcard");
                         sw.WriteLine("/sdcard/falcom/ED_SORA3");
                         sw.WriteLine("/sdcard/falcom/YSO");
+                        sw.WriteLine("/sdcard/falcom/YS6");
+                        #else
+                        foreach (var dir in GetOggDirectories ("/sdcard"))
+                            sw.WriteLine (dir);
+                        #endif
                     }
                 }
                 List<string> dirlist = new List<string> ();
@@ -115,6 +121,16 @@ namespace Falplayer
             stop_button.Click += delegate {
                 player.Stop ();
             };
+        }
+
+        IEnumerable<string> GetOggDirectories (string path)
+        {
+            foreach (var dir in Directory.EnumerateDirectories (path)) {
+                if (Directory.EnumerateFiles (dir).Any (f => f.EndsWith (".ogg", StringComparison.OrdinalIgnoreCase)))
+                    yield return dir;
+                foreach (var sub in GetOggDirectories (dir))
+                    yield return sub;
+            }
         }
 
         internal void SetPlayState ()
@@ -235,7 +251,7 @@ namespace Falplayer
         PlayerView view;
         OggStreamBuffer vorbis_buffer;
         LoopCommentExtension loop;
-        PlayerAsyncTask task;
+        CorePlayer task;
 
         public Player (Activity activity)
         {
@@ -247,7 +263,7 @@ namespace Falplayer
             this.activity = activity;
             view = new PlayerView (this, activity);
             // "* n" part is adjusted for emulator.
-            task = new PlayerAsyncTask(this);
+            task = new CorePlayer (this);
             headset_status_receiver = new HeadphoneStatusReceiver (this);
         }
 
@@ -269,10 +285,10 @@ namespace Falplayer
             var hist = GetPlayHistory ();
             if (!hist.Contains (file)) {
                 var ifs = IsolatedStorageFile.GetUserStoreForApplication ();
-                using (var sw = new StreamWriter (ifs.OpenFile ("history.txt", FileMode.Append))) {
-                    foreach (var h in hist.Skip (1))
+                using (var sw = new StreamWriter (ifs.OpenFile ("history.txt", FileMode.Create))) {
+                    sw.WriteLine(file);
+                    foreach (var h in hist.Take (Math.Min (9, hist.Length)))
                         sw.WriteLine (h);
-                    sw.WriteLine (file);
                 }
             }
 
@@ -305,7 +321,7 @@ namespace Falplayer
                 task.Resume ();
             else {
                 Stop ();
-                task = new PlayerAsyncTask (this);
+                task = new CorePlayer (this);
                 InitializeVorbisBuffer ();
                 //task.Execute ();
                 task.Start ();
@@ -357,7 +373,7 @@ namespace Falplayer
             Paused,
         }
 
-        class PlayerAsyncTask //: AsyncTask
+        class CorePlayer
         {
             static readonly int min_buf_size = AudioTrack.GetMinBufferSize(44100 / CompressionRate * 2, (int)ChannelConfiguration.Stereo, Encoding.Pcm16bit);
             int buf_size = min_buf_size * 8;
@@ -371,7 +387,7 @@ namespace Falplayer
             long loop_start, loop_length, loop_end, total;
             Thread player_thread;
 
-            public PlayerAsyncTask (Player player)
+            public CorePlayer (Player player)
             {
                 this.player = player;
                 audio = new AudioTrack (Android.Media.Stream.Music, 44100 / CompressionRate * 2, ChannelConfiguration.Stereo, Android.Media.Encoding.Pcm16bit, buf_size * 2, AudioTrackMode.Stream);
@@ -428,14 +444,8 @@ namespace Falplayer
             {
                 player_thread.Start ();
             }
-            /*
-            protected override Java.Lang.Object DoInBackground(params Java.Lang.Object[] @params)
-            {
-                return DoRun();
-            }
-            */
 
-            Java.Lang.Object DoRun()
+            Java.Lang.Object DoRun ()
             {
                 player.vorbis_buffer.SeekRaw (0);
                 Status = PlayerStatus.Playing;
