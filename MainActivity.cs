@@ -50,7 +50,7 @@ namespace Falplayer
             {
                 // FIXME: not sure why, but EnumerateFiles (dir, "*.ogg") fails.
                 // FIXME: case insensitive search is desired.
-                string[] files;
+                string [] files;
                 try {
                     files = Directory.GetFiles (dir, "*.ogg");
                 } catch (UnauthorizedAccessException) {
