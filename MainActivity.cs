@@ -114,7 +114,6 @@ namespace Falplayer
 
             stop_button.Click += delegate {
                 player.Stop ();
-                play_button.Text = "Play";
             };
         }
 
@@ -166,13 +165,15 @@ namespace Falplayer
 
         public void Reset ()
         {
-            play_button.Text = "Play";
-            title_text_view.Text = string.Format ("loop: {0} - {1} - {2}", loop_start, loop_length, total_length);
-            // Since our AudioTrack bitrate is fake, those markers must be faked too.
-            seekbar.Max = (int) total_length;
-            seekbar.Progress = 0;
-            seekbar.SecondaryProgress = (int) loop_end;
-            seekbar.SetOnSeekBarChangeListener (this);
+            activity.RunOnUiThread (delegate {
+                play_button.Text = "Play";
+                title_text_view.Text = string.Format ("loop: {0} - {1} - {2}", loop_start, loop_length, total_length);
+                // Since our AudioTrack bitrate is fake, those markers must be faked too.
+                seekbar.Max = (int) total_length;
+                seekbar.Progress = 0;
+                seekbar.SecondaryProgress = (int) loop_end;
+                seekbar.SetOnSeekBarChangeListener (this);
+                });
         }
 
         public bool PlayerEnabled {
@@ -206,10 +207,6 @@ namespace Falplayer
         {
             loops++;
             seekbar.Progress = (int)resetPosition;
-        }
-
-        public void ProcessComplete ()
-        {
         }
 
         public void OnProgressChanged (SeekBar seekBar, int progress, bool fromUser)
@@ -325,7 +322,6 @@ namespace Falplayer
 
         public void Stop ()
         {
-            view.Reset ();
             task.Stop ();
         }
 
@@ -336,7 +332,7 @@ namespace Falplayer
 
         internal void OnComplete ()
         {
-            view.ProcessComplete();
+            view.Reset ();
         }
 
         internal void OnPlayerError (string msgbase, params object [] args)
@@ -441,6 +437,7 @@ namespace Falplayer
 
             Java.Lang.Object DoRun()
             {
+                player.vorbis_buffer.SeekRaw (0);
                 Status = PlayerStatus.Playing;
                 x = 0;
                 total = 0;
