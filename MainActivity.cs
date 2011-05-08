@@ -73,7 +73,7 @@ namespace Falplayer
         TitleDatabase database;
         MainActivity activity;
         Button load_button, play_button, stop_button, rescan_button;
-        TextView title_text_view;
+        TextView title_text_view, timeline_text_view;
         SeekBar seekbar;
         long loop_start, loop_length, loop_end, total_length;
         int loops;
@@ -89,6 +89,7 @@ namespace Falplayer
             this.rescan_button = activity.FindViewById<Button>(Resource.Id.RescanButton);
             this.seekbar = activity.FindViewById<SeekBar>(Resource.Id.SongSeekbar);
             this.title_text_view = activity.FindViewById<TextView>(Resource.Id.SongTitleTextView);
+            this.timeline_text_view = activity.FindViewById<TextView>(Resource.Id.TimelineTextView);
             PlayerEnabled = false;
 
             var ifs = IsolatedStorageFile.GetUserStoreForApplication ();
@@ -190,6 +191,7 @@ namespace Falplayer
                 db.SetItems (files, delegate (object o, DialogClickEventArgs e) {
                     int idx = (int) e.Which;
                     Android.Util.Log.Debug ("FALPLAYER", "selected song index: " + idx);
+                    title_text_view.Text = files [idx];
                     action (l [idx]);
                 });
             }
@@ -211,7 +213,7 @@ namespace Falplayer
         {
             activity.RunOnUiThread (delegate {
                 play_button.Text = "Play";
-                title_text_view.Text = string.Format ("loop: {0} - {1} - {2}", loop_start, loop_length, total_length);
+                timeline_text_view.Text = string.Format ("loop: {0} - {1} - {2}", loop_start, loop_length, total_length);
                 // Since our AudioTrack bitrate is fake, those markers must be faked too.
                 seekbar.Max = (int) total_length;
                 seekbar.Progress = 0;
@@ -242,7 +244,7 @@ namespace Falplayer
         public void ReportProgress (long pos)
         {
             activity.RunOnUiThread (delegate {
-                title_text_view.Text = String.Format("loop: {0} / cur {1} / end {2}", loops, pos, loop_end);
+                timeline_text_view.Text = String.Format("loop: {0} / cur {1} / end {2}", loops, pos, loop_end);
                 seekbar.Progress = (int) pos;
             });
         }
