@@ -31,9 +31,11 @@ namespace Falplayer
             // Set our view from the "main" layout resource
             SetContentView(Resource.Layout.Main);
 
-            player = new Player (this);
+            title_database = new TitleDatabase (this);
+            player = new Player(title_database, this);
         }
         Player player;
+        TitleDatabase title_database;
 
         internal void CreateSongDirectoryList ()
         {
@@ -68,6 +70,7 @@ namespace Falplayer
     {
         const string from_history_tag = "<from history>";
         Player player;
+        TitleDatabase database;
         MainActivity activity;
         Button load_button, play_button, stop_button, rescan_button;
         TextView title_text_view;
@@ -75,9 +78,10 @@ namespace Falplayer
         long loop_start, loop_length, loop_end, total_length;
         int loops;
 
-        public PlayerView (Player player, MainActivity activity)
+        public PlayerView (Player player, TitleDatabase database, MainActivity activity)
         {
             this.player = player;
+            this.database = database;
             this.activity = activity;
             this.load_button = activity.FindViewById<Button>(Resource.Id.SelectButton);
             this.play_button = activity.FindViewById<Button>(Resource.Id.PlayButton);
@@ -87,13 +91,15 @@ namespace Falplayer
             this.title_text_view = activity.FindViewById<TextView>(Resource.Id.SongTitleTextView);
             PlayerEnabled = false;
 
-            load_button.Click += delegate {
+            var ifs = IsolatedStorageFile.GetUserStoreForApplication ();
+            if (!ifs.FileExists ("songdirs.txt"))
+                load_button.Enabled = false;
+
+            load_button.Click += delegate
+            {
                 var db = new AlertDialog.Builder (activity);
                 db.SetTitle ("Select Music Folder");
 
-                var ifs = IsolatedStorageFile.GetUserStoreForApplication ();
-                if (!ifs.FileExists ("songdirs.txt"))
-                    CreateSongDirectoryList ();
                 List<string> dirlist = new List<string> ();
                 if (ifs.FileExists ("history.txt"))
                     dirlist.Add (from_history_tag);
@@ -130,7 +136,14 @@ namespace Falplayer
             };
 
             rescan_button.Click += delegate {
-                CreateSongDirectoryList ();
+                var db = new AlertDialog.Builder(activity);
+                db.SetMessage ("Scan music directories. This operation takes a while.");
+                db.SetPositiveButton ("OK", delegate {
+                    CreateSongDirectoryList ();
+                    load_button.Enabled = true;
+                    });
+                db.SetCancelable (true);
+                db.Show ();
             };
         }
 
@@ -173,7 +186,7 @@ namespace Falplayer
                 db.SetMessage ("No music files there");
             else {
                 db.SetTitle ("Select Music File");
-                var files = (from f in l select Path.GetFileName (f)).ToArray ();
+                var files = (from f in l select database.GetTitle (f, (int) new FileInfo (f).Length) ?? Path.GetFileName (f)).ToArray ();
                 db.SetItems (files, delegate (object o, DialogClickEventArgs e) {
                     int idx = (int) e.Which;
                     Android.Util.Log.Debug ("FALPLAYER", "selected song index: " + idx);
@@ -268,15 +281,15 @@ namespace Falplayer
         LoopCommentExtension loop;
         CorePlayer task;
 
-        public Player (MainActivity activity)
+        public Player (TitleDatabase database, MainActivity activity)
         {
-            Initialize (activity);
+            Initialize (database, activity);
         }
 
-        void Initialize (MainActivity activity)
+        void Initialize (TitleDatabase database, MainActivity activity)
         {
             this.activity = activity;
-            view = new PlayerView (this, activity);
+            view = new PlayerView (this, database, activity);
             // "* n" part is adjusted for emulator.
             task = new CorePlayer (this);
             headset_status_receiver = new HeadphoneStatusReceiver (this);
@@ -563,6 +576,46 @@ namespace Falplayer
         public long Total
         {
             get { return total; }
+        }
+    }
+
+    class TitleDatabase
+    {
+        public class SongData
+        {
+            static readonly char [] ws = new char [] {' '};
+            public SongData (string line)
+            {
+                Android.Util.Log.Debug ("FALPLAYER", "parsing: " + line);
+                var items = line.Split (ws, StringSplitOptions.RemoveEmptyEntries);
+                FileName = items [0];
+                FileSize = int.Parse (items [1]);
+                Title = line.Substring (items [0].Length + 1 + items [1].Length).Trim ();
+            }
+
+            public string FileName { get; set; }
+            public int FileSize { get; set; }
+            public string Title { get; set; }
+        }
+
+        new List<SongData> list;
+
+        public TitleDatabase (MainActivity activity)
+        {
+            list = new List<SongData> ();
+            foreach (var ass in activity.Assets.List ("titles")) {
+                using (var stream = activity.Assets.Open ("titles/" + ass))
+                    foreach (var line in new StreamReader (stream).ReadToEnd ().Replace ("\r", "").Split ('\n'))
+                        if (!String.IsNullOrEmpty (line) && !line.StartsWith ("//", StringComparison.Ordinal))
+                            list.Add (new SongData (line));
+            }
+        }
+
+        public string GetTitle (string filename, int fileSize)
+        {
+            string fn = Path.GetFileName (filename);
+            var t = list.FirstOrDefault (i => i.FileName == fn && i.FileSize == fileSize);
+            return t != null ? t.Title : null;
         }
     }
 }

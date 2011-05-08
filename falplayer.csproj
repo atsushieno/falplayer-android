@@ -72,6 +72,10 @@
     <AndroidResource Include="Resources\Drawable\Icon.png" />
   </ItemGroup>
   <ItemGroup>
+    <AndroidAsset Include="Assets\titles\titles_ys6.txt" />
+    <AndroidAsset Include="Assets\titles\titles_yso.txt" />
+    <AndroidAsset Include="Assets\titles\titles_ed_sora2.txt" />
+    <AndroidAsset Include="Assets\titles\titles_ed_sora3.txt" />
     <Content Include="Properties\AndroidManifest.xml" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Novell\Novell.MonoDroid.CSharp.targets" />

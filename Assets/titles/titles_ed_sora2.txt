@@ -1,0 +1,99 @@
+﻿// Titles taken from xfu.jp/falcom/wiki/wiki.cgi/ed6sc?page=BGM
+ED6001.ogg 2269547 風を共に舞う気持ち SC ver
+ED6010.ogg 3263851 Shine of Eidos ～空の軌跡～
+ED6011.ogg 3546633 銀の意志 金の翼(Game ver)
+ED6012.ogg 8752464 I swear...
+ED6015.ogg 4721306 解き放たれた至宝
+ED6016.ogg 5164445 女神の御許へ
+ED6017.ogg 3233993 折られた翼
+ED6018.ogg 7452369 希望の行方
+ED6100.ogg 3202008 地方都市ロレント
+ED6101.ogg 2580374 商業都市ボース
+ED6102.ogg 3263855 湾岸都市ルーアン
+ED6103.ogg 3913335 工房都市ツァイス
+ED6104.ogg 4365131 王都グランセル
+ED6105.ogg 3725826 陽だまりにて和む猫
+ED6106.ogg 3350381 国境警備も楽じゃない
+ED6107.ogg 3302762 王城
+ED6108.ogg 2894193 グランアリーナ
+ED6110.ogg 4248935 ル＝ロックルへようこそ
+ED6111.ogg 3966891 灯火が消えた街
+ED6112.ogg 2390053 Heartless Surprise Attack
+ED6113.ogg 4548607 飛行戦艦グロリアス
+ED6200.ogg 3771555 リベールの歩き方
+ED6201.ogg 1972039 Secret Green Passage
+ED6202.ogg 1787969 Rock On The Road
+ED6210.ogg 3628919 空を見上げて
+ED6300.ogg 2985118 闇を彷徨う
+ED6301.ogg 2780218 行く手を阻むはばむ床
+ED6302.ogg 2760398 暗がりがくれた安らぎ
+ED6303.ogg 3259111 四輪の塔
+ED6304.ogg 3786206 レイストン要塞
+ED6305.ogg 7673638 虚ろなる光の封土
+ED6310.ogg 3382180 隠された真の姿
+ED6311.ogg 4070540 潜入
+ED6312.ogg 4306775 浮遊都市リベルアーク
+ED6313.ogg 3326102 その先を目指して
+ED6314.ogg 4705843 中枢塔《アクシスピラー》
+ED6315.ogg 228210
+ED6316.ogg 3694940 仲間の元へ
+ED6400.ogg 3497350 Sophisticated Fight
+ED6402.ogg 2762929 To be Suggestive
+ED6403.ogg 3415665 銀の意志
+ED6404.ogg 3368329 Challenger Invited
+ED6405.ogg 3813687 Ancient Makes
+ED6406.ogg 3194188 至宝を守護せしモノ
+ED6407.ogg 1452227 撃破！！
+ED6408.ogg 2289427 消え行く星
+ED6410.ogg 3646215 ピンチ！！
+ED6420.ogg 3551228 Strepitoso Fight
+ED6421.ogg 4617945 The Fate Of The Fairies
+ED6422.ogg 3405492 Fight with Assailant
+ED6423.ogg 2665627 Obstructive Existence
+ED6424.ogg 3417955 大いなる畏怖
+ED6425.ogg 3887259 Fateful confrontation
+ED6426.ogg 4828788 Outskirts of Evolution
+ED6427.ogg 11288995 The Merciless Savior
+ED6428.ogg 5193055 雷の穿つ墓標
+ED6429.ogg 3803132 Feeling Danger Nearby
+ED6500.ogg 664961 星の在り処 Harmonica short Ver
+ED6501.ogg 1758535 琥珀の愛 Hum Ver
+ED6502.ogg 1318106 琥珀の愛 Piano Ver
+ED6503.ogg 1686834 琥珀の愛 Lute Ver
+ED6504.ogg 2416615 星の在り処 Harmonica long ver
+ED6505.ogg 3779466 賑やかに行こう
+ED6510.ogg 1841088 去り行く決意
+ED6511.ogg 3016164 暗躍する者たち
+ED6512.ogg 2506766 奴を逃がすな！
+ED6513.ogg 3068716 胸の中に
+ED6514.ogg 2728538 月明かりの下で
+ED6516.ogg 2890140 忍び寄る危機
+ED6517.ogg 2694445 俺たちカプア一家！
+ED6518.ogg 2915371 旅立ちの小径
+ED6519.ogg 3524080 奪還
+ED6520.ogg 4951655 呪縛からの解放、そして…
+ED6521.ogg 2302994 告白
+ED6522.ogg 1246388 黒のオーブメント
+ED6523.ogg 2739666 リベールの誇り
+ED6530.ogg 1332319 姫の悩み
+ED6531.ogg 1264669 騎士達の嘆き
+ED6532.ogg 2116567 それぞれの思惑
+ED6533.ogg 1008006 城
+ED6534.ogg 1349137 コロシアム
+ED6535.ogg 1562645 決闘
+ED6536.ogg 2718001 姫の死
+ED6537.ogg 1079488 大団円
+ED6540.ogg 3060074 陰謀
+ED6541.ogg 3547057 執行者
+ED6542.ogg 6701094 福音計画
+ED6543.ogg 2119211 迫りくる脅威
+ED6544.ogg 4153379 ハーメル
+ED6546.ogg 3307667 うちひしがれて
+ED6547.ogg 3741972 荒野に潜む影
+ED6548.ogg 5367255 夢の続き
+ED6549.ogg 3920728 絆の在り処
+ED6550.ogg 4623891 銀の意志　Super Arrange Ver.
+ED6551.ogg 7201680 星の在り処 
+ED6552.ogg 1441161 Etude of the Ruin
+ED6554.ogg 6273089 惨劇の真相
+ED6556.ogg 5862294 夢幻
