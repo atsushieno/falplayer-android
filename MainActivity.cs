@@ -144,6 +144,7 @@ namespace Falplayer
                     load_button.Enabled = true;
                     });
                 db.SetCancelable (true);
+                db.SetNegativeButton ("Cancel", delegate {});
                 db.Show ();
             };
         }
@@ -190,7 +191,6 @@ namespace Falplayer
                 var files = (from f in l select database.GetTitle (f, (int) new FileInfo (f).Length) ?? Path.GetFileName (f)).ToArray ();
                 db.SetItems (files, delegate (object o, DialogClickEventArgs e) {
                     int idx = (int) e.Which;
-                    Android.Util.Log.Debug ("FALPLAYER", "selected song index: " + idx);
                     title_text_view.Text = files [idx];
                     action (l [idx]);
                 });
@@ -311,7 +311,6 @@ namespace Falplayer
 
         public void SelectFile (string file)
         {
-            Android.Util.Log.Debug ("FALPLAYER", "file to play: " + file);
             var hist = GetPlayHistory ();
             if (!hist.Contains (file)) {
                 var ifs = IsolatedStorageFile.GetUserStoreForApplication ();
@@ -353,7 +352,6 @@ namespace Falplayer
                 Stop ();
                 task = new CorePlayer (this);
                 InitializeVorbisBuffer ();
-                //task.Execute ();
                 task.Start ();
             }
             view.SetPlayState ();
@@ -405,7 +403,7 @@ namespace Falplayer
 
         class CorePlayer
         {
-            static readonly int min_buf_size = AudioTrack.GetMinBufferSize(44100 / CompressionRate * 2, (int)ChannelConfiguration.Stereo, Encoding.Pcm16bit);
+            static readonly int min_buf_size = AudioTrack.GetMinBufferSize(44100 / CompressionRate * 2, (int) ChannelConfiguration.Stereo, Encoding.Pcm16bit);
             int buf_size = min_buf_size * 8;
 
             AudioTrack audio;
@@ -450,17 +448,26 @@ namespace Falplayer
 
             public void Seek (long pos)
             {
+                if (Status == PlayerStatus.Playing)
+                    return; // ignore
                 if (pos < 0 || pos >= loop_end) 
                     return; // ignore
+                /*
                 var prevStat = Status;
-                if (prevStat == PlayerStatus.Playing)
+                if (prevStat == PlayerStatus.Playing) {
                     Pause ();
-                audio.Flush ();
+                    Android.Util.Log.Debug("FALPLAYER", "!!!!! Pause done " + pos);
+                }
+                */
                 SpinWait.SpinUntil(() => !pause);
-                total = pos;
                 player.vorbis_buffer.SeekPcm (pos / 4);
-                if (prevStat == PlayerStatus.Playing)
+                total = pos;
+                /*
+                if (prevStat == PlayerStatus.Playing) {
                     Resume ();
+                    Android.Util.Log.Debug ("FALPLAYER", "!!!!! Resumed after Seek");
+                }
+                */
             }
 
             public void Stop ()
@@ -588,7 +595,6 @@ namespace Falplayer
             static readonly char [] ws = new char [] {' '};
             public SongData (string line)
             {
-                Android.Util.Log.Debug ("FALPLAYER", "parsing: " + line);
                 var items = line.Split (ws, StringSplitOptions.RemoveEmptyEntries);
                 FileName = items [0];
                 FileSize = int.Parse (items [1]);
