@@ -76,6 +76,7 @@ namespace Falplayer
         TextView title_text_view, timeline_text_view;
         SeekBar seekbar;
         long loop_start, loop_length, loop_end, total_length;
+        TimeSpan total_time;
         int loops;
 
         public PlayerView (Player player, TitleDatabase database, MainActivity activity)
@@ -198,13 +199,14 @@ namespace Falplayer
             db.Show().Show();
         }
 
-        public void Initialize (long totalLength, long loopStart, long loopLength, long loopEnd)
+        public void Initialize (long totalLength, long loopStart, long loopLength, long loopEnd, long totalTime)
         {
             loops = 0;
             loop_start = loopStart;
             loop_length = loopLength;
             loop_end = loopEnd;
             total_length = totalLength;
+            total_time = TimeSpan.FromMilliseconds (totalTime);
             PlayerEnabled = true;
             Reset ();
         }
@@ -213,7 +215,7 @@ namespace Falplayer
         {
             activity.RunOnUiThread (delegate {
                 play_button.Text = "Play";
-                timeline_text_view.Text = string.Format ("loop: {0} - {1} - {2}", loop_start, loop_length, total_length);
+                timeline_text_view.Text = GetTimeline (0, TimeSpan.Zero);
                 // Since our AudioTrack bitrate is fake, those markers must be faked too.
                 seekbar.Max = (int) total_length;
                 seekbar.Progress = 0;
@@ -241,10 +243,16 @@ namespace Falplayer
                 });
         }
 
-        public void ReportProgress (long pos)
+        string GetTimeline (long pos, TimeSpan playTime)
+        {
+            return string.Format ("loop: {0} / cur: {1} / end: {2}\ntime: {3:T} / {4:T}",
+                loops, pos, loop_end, playTime, total_time);
+        }
+
+        public void ReportProgress (long pos, TimeSpan time)
         {
             activity.RunOnUiThread (delegate {
-                timeline_text_view.Text = String.Format("loop: {0} / cur {1} / end {2}", loops, pos, loop_end);
+                timeline_text_view.Text = GetTimeline (pos, time);
                 seekbar.Progress = (int) pos;
             });
         }
@@ -282,6 +290,7 @@ namespace Falplayer
         OggStreamBuffer vorbis_buffer;
         LoopCommentExtension loop;
         CorePlayer task;
+        DateTime start_time;
 
         public Player (TitleDatabase database, MainActivity activity)
         {
@@ -328,7 +337,7 @@ namespace Falplayer
 
         public void InitializeVorbisBuffer ()
         {
-            view.Initialize(loop.Total * 4, loop.Start * 4, loop.Length * 4, loop.End * 4);
+            view.Initialize (loop.Total * 4, loop.Start * 4, loop.Length * 4, loop.End * 4, vorbis_buffer.GetTotalTime (-1));
             task.LoadVorbisBuffer (vorbis_buffer, loop);
         }
 
@@ -354,6 +363,7 @@ namespace Falplayer
                     task.Dispose ();
                 task = new CorePlayer (this);
                 InitializeVorbisBuffer ();
+                start_time = DateTime.Now;
                 task.Start ();
             }
             view.SetPlayState ();
@@ -388,7 +398,7 @@ namespace Falplayer
 
         internal void OnProgress (long pos)
         {
-            view.ReportProgress (pos);
+            view.ReportProgress (pos, DateTime.Now - start_time);
         }
 
         internal void OnLoop (long resetPosition)
@@ -456,7 +466,7 @@ namespace Falplayer
             {
                 if (pos < 0 || pos >= loop_end) 
                     return; // ignore
-                if (DateTime.Now - last_seek < TimeSpan.FromMilliseconds(500))
+                if (DateTime.Now - last_seek < TimeSpan.FromMilliseconds (500))
                     return; // too short seek operations
                 last_seek = DateTime.Now;
                 SpinWait.SpinUntil (() => !pause);
@@ -509,7 +519,7 @@ namespace Falplayer
                         size = loop_end - total; // cut down the buffer after loop
                     total += size;
 
-                    if (++x % 50 == 0)
+                    if (++x % 30 == 0)
                         player.OnProgress (total);
 
                     // downgrade bitrate
@@ -614,7 +624,7 @@ namespace Falplayer
             public string Title { get; set; }
         }
 
-        new List<SongData> list;
+        List<SongData> list;
 
         public TitleDatabase (MainActivity activity)
         {

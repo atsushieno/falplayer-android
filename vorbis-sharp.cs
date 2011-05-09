@@ -679,7 +679,7 @@ namespace UnmanagedOgg
 		[DllImport (FileLibrary)]
 		static internal extern long ov_pcm_total (OggVorbisFilePtr vf, C_INT i);
 		[DllImport (FileLibrary)]
-		static internal extern long ov_time_total (OggVorbisFilePtr vf, C_INT i);
+        static internal extern OV_LONG ov_time_total (OggVorbisFilePtr vf, C_INT i);
 
 		[DllImport (FileLibrary)]
 		static internal extern C_INT ov_raw_seek (OggVorbisFilePtr vf, long pos);
