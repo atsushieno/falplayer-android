@@ -275,7 +275,7 @@ namespace Falplayer
 
     class Player
     {
-        const int CompressionRate = 4;
+        const int CompressionRate = 2;
 
         Activity activity;
         PlayerView view;
@@ -292,7 +292,6 @@ namespace Falplayer
         {
             this.activity = activity;
             view = new PlayerView (this, database, activity);
-            // "* n" part is adjusted for emulator.
             task = new CorePlayer (this);
             headset_status_receiver = new HeadphoneStatusReceiver (this);
         }
@@ -350,7 +349,8 @@ namespace Falplayer
                 task.Resume ();
             else {
                 Stop ();
-                task = new CorePlayer (this);
+                SpinWait.SpinUntil(() => task.Status == PlayerStatus.Stopped);
+                task = new CorePlayer(this);
                 InitializeVorbisBuffer ();
                 task.Start ();
             }
@@ -418,8 +418,10 @@ namespace Falplayer
             public CorePlayer (Player player)
             {
                 this.player = player;
-                audio = new AudioTrack (Android.Media.Stream.Music, 44100 / CompressionRate * 2, ChannelConfiguration.Stereo, Android.Media.Encoding.Pcm16bit, buf_size * 2, AudioTrackMode.Stream);
-                buffer = new byte [buf_size / 2 / CompressionRate];
+                // "* n" part is adjusted for device.
+                audio = new AudioTrack (Android.Media.Stream.Music, 44100 / CompressionRate * 2, ChannelConfiguration.Stereo, Android.Media.Encoding.Pcm16bit, buf_size * 4, AudioTrackMode.Stream);
+                // FIXME: when I set to "bufsize / 2 / CompressionRate" with CompressionRate = 2, AudioTrack.Write() blocks for some songs...
+                buffer = new byte [buf_size / 4 / CompressionRate];
                 player_thread = new Thread (() => DoRun ());
             }
 
@@ -459,7 +461,7 @@ namespace Falplayer
                     Android.Util.Log.Debug("FALPLAYER", "!!!!! Pause done " + pos);
                 }
                 */
-                SpinWait.SpinUntil(() => !pause);
+                SpinWait.SpinUntil (() => !pause);
                 player.vorbis_buffer.SeekPcm (pos / 4);
                 total = pos;
                 /*
@@ -474,12 +476,15 @@ namespace Falplayer
             {
                 finish = true; // and let player loop finish.
                 pause_handle.Set ();
-                Status = PlayerStatus.Stopped;
             }
 
             public void Start ()
             {
-                player_thread.Start ();
+                if (Status == PlayerStatus.Playing) {
+                    Stop ();
+                    SpinWait.SpinUntil (() => Status == PlayerStatus.Stopped);
+                }
+                player_thread.Start();
             }
 
             Java.Lang.Object DoRun ()
@@ -498,38 +503,42 @@ namespace Falplayer
                         pause_handle.WaitOne ();
                         audio.Play ();
                     }
-                    long ret = player.vorbis_buffer.Read (buffer, 0, buffer.Length);
-                    if (ret <= 0 || ret > buffer.Length) {
+                    long size = player.vorbis_buffer.Read (buffer, 0, buffer.Length);
+                    if (size <= 0 || size > buffer.Length) {
                         finish = true;
-                        if (ret < 0)
-                            player.OnPlayerError ("vorbis error : {0}", ret);
-                        else if (ret > buffer.Length)
-                            player.OnPlayerError ("buffer overflow : {0}", ret);
+                        if (size < 0)
+                            player.OnPlayerError ("vorbis error : {0}", size);
+                        else if (size > buffer.Length)
+                            player.OnPlayerError ("buffer overflow : {0}", size);
                         break;
                     }
 
-                    if (ret + total >= loop_end)
-                        ret = loop_end - total; // cut down the buffer after loop
-                    total += ret;
+                    if (size + total >= loop_end)
+                        size = loop_end - total; // cut down the buffer after loop
+                    total += size;
 
                     if (++x % 50 == 0)
                         player.OnProgress (total);
 
                     // downgrade bitrate
-                    for (int i = 1; i < ret * 2 / CompressionRate; i++)
-                        buffer[i] = buffer[i * CompressionRate / 2 + (CompressionRate / 2) - 1];
-                    audio.Write (buffer, 0, (int)ret * 2 / CompressionRate);
+                    int actualSize = (int) size * 2 / CompressionRate;
+                    for (int i = 1; i < actualSize; i++)
+                        buffer [i] = buffer [i * CompressionRate / 2 + (CompressionRate / 2) - 1];
+                    if (size > 0) {
+                        audio.Flush ();
+                        audio.Write (buffer, 0, actualSize);
+                    }
                     // loop back to LOOPSTART
-                    if (total >= loop_end)
-                    {
-                        player.OnLoop (loop_start);
+                    if (total >= loop_end) {
                         player.vorbis_buffer.SeekPcm (loop_start / 4); // also faked
+                        player.OnLoop (loop_start);
                         total = loop_start;
                     }
                 }
                 audio.Flush ();
                 audio.Stop ();
                 player.OnComplete ();
+                Status = PlayerStatus.Stopped;
                 return null;
             }
         }
