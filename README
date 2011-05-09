@@ -1,0 +1,13 @@
+Falplayer is an Ogg Vorbis music player that supports loop. So you can enjoy
+listening to one ogg file infinitely as long as the player runs.
+
+Falplayer is built upon Mono for Android:
+http://mono-android.net/
+
+Falplayer is licensed under the MIT License. Sources are available at:
+https://github.com/atsushieno/falplayer-android
+
+Application icon is based on the picture at:
+http://www.flickr.com/photos/jackenhack/4271897410/
+
+Atsushi Eno
