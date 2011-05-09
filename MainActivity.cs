@@ -40,7 +40,7 @@ namespace Falplayer
         internal void CreateSongDirectoryList ()
         {
             var ifs = IsolatedStorageFile.GetUserStoreForApplication();
-            var list = GetOggDirectories ("/sdcard");
+            var list = GetOggDirectories ("/");
             using (var sw = new StreamWriter(ifs.CreateFile("songdirs.txt")))
                 foreach (var dir in list)
                     sw.WriteLine(dir);
@@ -350,7 +350,9 @@ namespace Falplayer
             else {
                 Stop ();
                 SpinWait.SpinUntil(() => task.Status == PlayerStatus.Stopped);
-                task = new CorePlayer(this);
+                if (task != null)
+                    task.Dispose ();
+                task = new CorePlayer (this);
                 InitializeVorbisBuffer ();
                 task.Start ();
             }
@@ -401,7 +403,7 @@ namespace Falplayer
             Paused,
         }
 
-        class CorePlayer
+        class CorePlayer : IDisposable
         {
             static readonly int min_buf_size = AudioTrack.GetMinBufferSize(44100 / CompressionRate * 2, (int) ChannelConfiguration.Stereo, Encoding.Pcm16bit);
             int buf_size = min_buf_size * 8;
@@ -448,28 +450,18 @@ namespace Falplayer
                 pause_handle.Set ();
             }
 
+            DateTime last_seek;
+
             public void Seek (long pos)
             {
-                if (Status == PlayerStatus.Playing)
-                    return; // ignore
                 if (pos < 0 || pos >= loop_end) 
                     return; // ignore
-                /*
-                var prevStat = Status;
-                if (prevStat == PlayerStatus.Playing) {
-                    Pause ();
-                    Android.Util.Log.Debug("FALPLAYER", "!!!!! Pause done " + pos);
-                }
-                */
+                if (DateTime.Now - last_seek < TimeSpan.FromMilliseconds(500))
+                    return; // too short seek operations
+                last_seek = DateTime.Now;
                 SpinWait.SpinUntil (() => !pause);
                 player.vorbis_buffer.SeekPcm (pos / 4);
                 total = pos;
-                /*
-                if (prevStat == PlayerStatus.Playing) {
-                    Resume ();
-                    Android.Util.Log.Debug ("FALPLAYER", "!!!!! Resumed after Seek");
-                }
-                */
             }
 
             public void Stop ()
@@ -480,11 +472,11 @@ namespace Falplayer
 
             public void Start ()
             {
-                if (Status == PlayerStatus.Playing) {
+                if (Status != PlayerStatus.Stopped) {
                     Stop ();
                     SpinWait.SpinUntil (() => Status == PlayerStatus.Stopped);
                 }
-                player_thread.Start();
+                player_thread.Start ();
             }
 
             Java.Lang.Object DoRun ()
@@ -540,6 +532,13 @@ namespace Falplayer
                 player.OnComplete ();
                 Status = PlayerStatus.Stopped;
                 return null;
+            }
+
+            public void Dispose ()
+            {
+                if (audio.PlayState != PlayState.Stopped)
+                    audio.Stop ();
+                audio.Release ();
             }
         }
     }
